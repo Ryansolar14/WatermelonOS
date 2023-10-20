@@ -1,6 +1,15 @@
 #include <IBusBM.h>
+#include <Servo.h>
 
 IBusBM IBus;
+
+const int rightMotorPin = 4;
+const int leftMotorPin = 5;
+const int weaponMotorPin = 6;
+
+Servo rightMotor;
+Servo leftMotor;
+Servo weaponMotor;
 
 void setup() {
   // put your setup code here, to run once:
@@ -13,29 +22,58 @@ void setup() {
   }
   Serial.println("Init done");
 
+  rightMotor.attach(rightMotorPin);
+  leftMotor.attach(leftMotorPin);
+  weaponMotor.attach(weaponMotorPin);
+
 }
 
-int savespd=0, saveturn=0;
+int savespd=0, saveturn=0, savefwd=0;
 
 void loop() {
-  int spd, turn;
+  long spd, turn, fwd, left, right, weapon;
   // speed depends on front switch (channel 5) (forward/backwards) and channel 2 (speed)
-  spd = ((int) IBus.readChannel(2)-1050); 
-  // every value below 1050 we interprete as stop 
-  if (spd<0) spd=0; else spd = (spd*4)/9; // value could reach (2000-1050)*4/9 = 422, but setspeed() will max at 400
-  if (IBus.readChannel(5)>1500) spd=-spd; // backward/forward depends on switch at channel 5
+  spd = ((int) IBus.readChannel(2)); 
   
   // turn depends on channel 0, scale down to -200, +200
-  turn = (((int) IBus.readChannel(0)-1500)*4)/10; 
+  turn = (((int) IBus.readChannel(0)-1500)); 
+  fwd = (((int) IBus.readChannel(1)-1500));
 
-  // set combined speed and turn (if speed==0, then only turn in place)
-  
+  left = -1*(fwd - turn);
+  right = fwd + turn;
 
-  if (savespd != spd || saveturn != turn) {
-    Serial.print("speed="); Serial.print(spd); // display speed
-    Serial.print(" turn="); Serial.println(turn); // display turn 
+  long iMax = max(abs(left), abs(right));
+
+  if(iMax > 500){
+    left = (left * 500) / iMax;
+    right = (right * 500) / iMax;
+  }
+
+  left += 1500;
+  right += 1500;
+  weapon = spd;
+
+  leftMotor.writeMicroseconds(left);
+  rightMotor.writeMicroseconds(right);
+  weaponMotor.writeMicroseconds(weapon);
+
+  if (savespd != spd || saveturn != turn || savefwd != fwd) {
+    Serial.print("speed="); 
+    Serial.println(spd); // display speed
+    Serial.print(" turn="); 
+    Serial.println(turn); // display turn 
+    Serial.print(" fwd="); 
+    Serial.println(fwd); // display turn
+    Serial.print(" left="); 
+    Serial.println(left); 
+    Serial.print(" right="); 
+    Serial.println(right); 
+    Serial.print(" weapon="); 
+    Serial.println(weapon); 
+    savefwd = fwd;
     savespd = spd;
     saveturn = turn;
   }
   delay(100);
+
 }
